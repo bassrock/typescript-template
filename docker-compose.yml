@@ -1,0 +1,35 @@
+version: '3.1'
+services:
+  mysql:
+    image: mysql:8
+    env_file:
+      - ./.docker/local.env #pull in a docker env
+    environment:
+      MYSQL_ALLOW_EMPTY_PASSWORD: 'true'
+      TZ: 'US/Central'
+    healthcheck: # ensure we are healthy
+      test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost']
+      timeout: 20s
+      retries: 10
+    ports:
+      - '3306:3306' #make it available on the host
+    volumes:
+      - .docker/mysql/schema:/docker-entrypoint-initdb.d:delegated # if we arent using something like prisma, we put .sql files here to build our database schema.
+
+  app:
+    image: node:20
+    working_dir: /app
+    ports:
+      - '4005:4005'
+    volumes:
+      - ./:/app
+    env_file: # merge our special docker env and our local env
+      - .docker/local.env
+      - .env
+    environment:
+      - NODE_ENV=local
+      - TZ=UTC
+    command: "bash -c 'cd /app && npm run start:dev'"
+    depends_on:
+      mysql:
+        condition: service_healthy
